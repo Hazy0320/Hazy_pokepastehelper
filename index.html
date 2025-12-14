@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokéPaste Generator</title>
+    
+    <script src="data.js"></script>
+    
+    <style>
+        /* --- 全体の設定 (ベース) --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f5f7;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        /* --- ヘッダーエリア --- */
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        /* ★ 左上に固定する一括読み込みボタン (sd.png) ★ */
+        .header-import-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            z-index: 9999;
+            display: block;
+        }
+        .header-import-btn:hover {
+            transform: scale(1.1);
+        }
+        .header-logo {
+            width: 100%; height: 100%; object-fit: contain;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 24px;
+            margin: 0; padding: 0;
+        }
+
+        /* --- 個別インポートボタン (45px x 45px) --- */
+        .individual-import-btn {
+            position: absolute; top: 20px; right: 20px;
+            width: 45px; height: 45px; cursor: pointer;
+            transition: transform 0.2s; z-index: 5;
+        }
+        .individual-import-btn:hover { transform: scale(1.1); }
+        .individual-import-btn:active { transform: scale(0.95); }
+
+        .import-btn-img {
+            width: 100%; height: 100%; object-fit: cover;
+            border-radius: 50%; border: 2px solid #eee;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); background-color: #fff;
+            display: block;
+        }
+        .import-btn-img:hover { border-color: #2a64a3; }
+        
+        .import-fallback {
+            width: 100%; height: 100%; border-radius: 50%;
+            background: linear-gradient(135deg, #2a64a3, #4a90e2);
+            color: white; font-size: 18px;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        /* --- モーダルウィンドウ --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 9999;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(3px);
+        }
+        .modal-content {
+            background: #fff; padding: 30px; border-radius: 16px;
+            width: 90%; max-width: 600px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center; animation: popIn 0.3s ease;
+        }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        
+        .modal-textarea {
+            width: 100%; height: 200px; padding: 15px;
+            border: 2px solid #e0e0e0; border-radius: 8px;
+            font-family: monospace; font-size: 14px;
+            box-sizing: border-box; resize: vertical; margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .modal-textarea:focus { border-color: #2a64a3; outline: none; background: #fff; }
+        
+        .modal-btn-group { display: flex; gap: 15px; justify-content: center; }
+        .modal-btn {
+            padding: 12px 30px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px;
+            transition: background 0.2s;
+        }
+        .btn-cancel { background: #f0f0f0; color: #555; }
+        .btn-cancel:hover { background: #e0e0e0; }
+        .btn-import { background: #2a64a3; color: white; }
+        .btn-import:hover { background: #1e4b7a; }
+
+        /* --- 下部ボタン --- */
+        .btn {
+            display: block; width: 100%; padding: 16px;
+            font-weight: bold; color: white; border: none; border-radius: 8px;
+            cursor: pointer; margin-top: 15px; font-size: 16px;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        #generate-button { background-color: #2a64a3; margin-top: 40px; box-shadow: 0 4px 15px rgba(42, 100, 163, 0.3); }
+        #copy-button { background-color: #2da382; box-shadow: 0 4px 15px rgba(45, 163, 130, 0.3); }
+        
+        #output-code {
+            width: 100%; height: 300px; padding: 20px;
+            border: 2px solid #eee; border-radius: 8px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 14px; resize: vertical;
+            background: #fdfdfd; box-sizing: border-box; margin-top: 20px;
+            line-height: 1.4; color: #333;
+        }
+
+        /* エラー表示 */
+        #status-bar { padding: 15px; margin-bottom: 20px; border-radius: 8px; font-weight: bold; font-size: 14px; display: none; text-align: center; }
+        .status-warn { background-color: #fff8e1; color: #f57f17; border: 1px solid #ffecb3; }
+        .status-error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+
+        /* --- 入力フォーム (指定CSS) --- */
+        .pokemon-section {
+            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 25px;
+            padding-top: 40px;
+            margin-bottom: 30px;
+            background: #fff;
+            position: relative;
+        }
+        .pokemon-section h2 {
+            color: #333;
+            font-size: 18px;
+            margin-top: 0;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .form-group label { display: block; font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #666; }
+        input[type="text"], input[type="number"] {
+            width: 100%; padding: 10px 12px;
+            border: 1px solid #ddd; border-radius: 6px;
+            box-sizing: border-box; font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus {
+            border-color: #2a64a3; outline: none;
+        }
+
+        /* 努力値・個体値 */
+        .stats-container {
+            display: flex; gap: 15px; margin: 20px 0;
+            background: #f8f9fa; padding: 15px; border-radius: 8px;
+        }
+        .stats-block { flex: 1; }
+        
+        /* 努力値タイトルの微調整 (合計表示用) */
+        .stats-block h3 { 
+            margin: 0 0 10px 0; font-size: 13px; color: #888; text-align: center; 
+            display: flex; justify-content: center; align-items: center; gap: 8px;
+        }
+        
+        .stat-input-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+        .stat-item { text-align: center; }
+        .stat-item label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
+        .stat-item input { text-align: center; padding: 5px; font-size: 13px; }
+
+        /* 技 */
+        .move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        /* ★ レスポンシブ対応 (画面幅600px以下で適用) ★ */
+        @media (max-width: 600px) {
+            .stats-container {
+                flex-direction: column;
+            }
+            .container {
+                padding: 20px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="open-pokepaste-btn" class="header-import-btn" title="PokéPaste(英語)を一括読み込み">
+        <img src="sd.png" alt="Paste" class="header-logo">
+    </div>
+
+    <div class="container">
+        <h1>PokéPaste Generator</h1>
+        
+        <div id="status-bar"></div>
+
+        <form id="pokepaste-form"></form>
+        
+        <button type="button" id="generate-button" class="btn">PokéPasteコードを生成</button>
+        <textarea id="output-code" readonly placeholder="生成結果がここに表示されます..."></textarea>
+        <button type="button" id="copy-button" class="btn">クリップボードにコピー</button>
+    </div>
+
+    <div class="modal-overlay" id="import-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">テキスト読み込み</h3>
+            <p id="modal-desc" style="font-size:13px; color:#666;">テキストを入力してください</p>
+            <textarea class="modal-textarea" id="import-text" placeholder=""></textarea>
+            <div class="modal-btn-group">
+                <button class="modal-btn btn-cancel" id="close-modal">キャンセル</button>
+                <button class="modal-btn btn-import" id="run-import">読み込む</button>
+            </div>
+        </div>
+    </div>
+
+    <datalist id="list-pokemon"></datalist>
+    <datalist id="list-items"></datalist>
+    <datalist id="list-abilities"></datalist>
+    <datalist id="list-natures"></datalist>
+    <datalist id="list-types"></datalist>
+    <datalist id="list-moves"></datalist>
+
+    <script>
+        // === 1. 初期設定 & データ統合 ===
+        const FALLBACK_TYPES = {
+            "ノーマル": "Normal", "ほのお": "Fire", "みず": "Water", "くさ": "Grass", "でんき": "Electric",
+            "こおり": "Ice", "かくとう": "Fighting", "どく": "Poison", "じめん": "Ground", "ひこう": "Flying",
+            "エスパー": "Psychic", "むし": "Bug", "いわ": "Rock", "ゴースト": "Ghost", "ドラゴン": "Dragon",
+            "あく": "Dark", "はがね": "Steel", "フェアリー": "Fairy", "ステラ": "Stellar"
+        };
+        const FALLBACK_NATURES = {
+            "いじっぱり": "Adamant", "ようき": "Jolly", "ひかえめ": "Modest", "おくびょう": "Timid",
+            "ゆうかん": "Brave", "れいせい": "Quiet", "なまいき": "Sassy", "のんき": "Relaxed",
+            "ずぶとい": "Bold", "わんぱく": "Impish", "おだやか": "Calm", "しんちょう": "Careful"
+        };
+
+        // 性格補正データ (表示用)
+        const NATURE_STATS = {
+            "さみしがり": "(A↑ B↓)", "いじっぱり": "(A↑ C↓)", "やんちゃ": "(A↑ D↓)", "ゆうかん": "(A↑ S↓)",
+            "ずぶとい": "(B↑ A↓)", "わんぱく": "(B↑ C↓)", "のうてんき": "(B↑ D↓)", "のんき": "(B↑ S↓)",
+            "ひかえめ": "(C↑ A↓)", "おっとり": "(C↑ B↓)", "うっかりや": "(C↑ D↓)", "れいせい": "(C↑ S↓)",
+            "おだやか": "(D↑ A↓)", "おとなしい": "(D↑ B↓)", "しんちょう": "(D↑ C↓)", "なまいき": "(D↑ S↓)",
+            "おくびょう": "(S↑ A↓)", "せっかち": "(S↑ B↓)", "ようき": "(S↑ C↓)", "むじゃき": "(S↑ D↓)",
+            "てれや": "", "がんばりや": "", "すなお": "", "きまぐれ": "", "まじめ": ""
+        };
+
+        // 逆引き用辞書 (英語 -> 日本語)
+        let REVERSE_DATA = { pokemon:{}, items:{}, abilities:{}, natures:{}, types:{}, moves:{} };
+
+        window.addEventListener('load', () => {
+            const statusEl = document.getElementById('status-bar');
+            if (typeof TRANSLATION_DATA === 'undefined') {
+                statusEl.style.display = 'block';
+                statusEl.className = 'status-error';
+                statusEl.innerHTML = `⚠️ 辞書ファイル (data.js) が読み込めません。<br>ファイル名やフォルダの場所を確認してください。`;
+                window.TRANSLATION_DATA = { pokemon:{}, moves:{}, abilities:{}, items:{}, natures:{}, types:{} };
+            } else {
+                normalizeAndMergeData();
+                createReverseData(); // 逆引き辞書の作成
+                setupAutocomplete();
+                statusEl.style.display = 'none';
+            }
+        });
+
+        function normalizeAndMergeData() {
+            if (!TRANSLATION_DATA.items && TRANSLATION_DATA.Items) TRANSLATION_DATA.items = TRANSLATION_DATA.Items;
+            if (!TRANSLATION_DATA.items && TRANSLATION_DATA.item) TRANSLATION_DATA.items = TRANSLATION_DATA.item;
+            if (!TRANSLATION_DATA.types && TRANSLATION_DATA.Types) TRANSLATION_DATA.types = TRANSLATION_DATA.Types;
+
+            // カテゴリ名のゆらぎ吸収
+            if (!TRANSLATION_DATA.abilities && TRANSLATION_DATA.ability) TRANSLATION_DATA.abilities = TRANSLATION_DATA.ability;
+            if (!TRANSLATION_DATA.natures && TRANSLATION_DATA.nature) TRANSLATION_DATA.natures = TRANSLATION_DATA.nature;
+            if (!TRANSLATION_DATA.types && TRANSLATION_DATA.type) TRANSLATION_DATA.types = TRANSLATION_DATA.type;
+
+            const keys = ['pokemon', 'moves', 'abilities', 'items', 'natures', 'types'];
+            keys.forEach(key => {
+                const otherKey = key + '_other';
+                if (TRANSLATION_DATA[otherKey]) {
+                    if (!TRANSLATION_DATA[key]) TRANSLATION_DATA[key] = {};
+                    Object.assign(TRANSLATION_DATA[key], TRANSLATION_DATA[otherKey]);
+                }
+            });
+            
+            if (!TRANSLATION_DATA.types || Object.keys(TRANSLATION_DATA.types).length === 0) TRANSLATION_DATA.types = FALLBACK_TYPES;
+            if (!TRANSLATION_DATA.natures || Object.keys(TRANSLATION_DATA.natures).length === 0) TRANSLATION_DATA.natures = FALLBACK_NATURES;
+            if (!TRANSLATION_DATA.items) TRANSLATION_DATA.items = {};
+            if (!TRANSLATION_DATA.moves) TRANSLATION_DATA.moves = {};
+            if (!TRANSLATION_DATA.abilities) TRANSLATION_DATA.abilities = {};
+            if (!TRANSLATION_DATA.pokemon) TRANSLATION_DATA.pokemon = {};
+        }
+
+        // 逆引き辞書を作る関数
+        function createReverseData() {
+            const categories = ['pokemon', 'items', 'abilities', 'natures', 'types', 'moves'];
+            categories.forEach(cat => {
+                const src = TRANSLATION_DATA[cat];
+                if(src) {
+                    Object.keys(src).forEach(jpKey => {
+                        const enVal = src[jpKey];
+                        if(enVal) {
+                            REVERSE_DATA[cat][enVal.toLowerCase()] = jpKey;
+                        }
+                    });
+                }
+            });
+        }
+
+        // 逆引き検索関数 (英語 -> 日本語)
+        function reverseTranslate(text, type) {
+            if(!text) return '';
+            const dict = REVERSE_DATA[type];
+            const key = text.toLowerCase();
+            if(dict && dict[key]) return dict[key];
+            return text;
+        }
+
+        function setupAutocomplete() {
+            createOptions('list-pokemon', TRANSLATION_DATA.pokemon);
+            createOptions('list-items', TRANSLATION_DATA.items);
+            createOptions('list-abilities', TRANSLATION_DATA.abilities);
+            createOptions('list-natures', TRANSLATION_DATA.natures, 'natures');
+            createOptions('list-types', TRANSLATION_DATA.types);
+            createOptions('list-moves', TRANSLATION_DATA.moves);
+        }
+
+        function createOptions(listId, dataObj, category) {
+            const list = document.getElementById(listId);
+            list.innerHTML = '';
+            const sortedKeys = Object.keys(dataObj).sort();
+            sortedKeys.forEach(key => {
+                const option = document.createElement('option');
+                let displayValue = key;
+                if (category === 'natures' && NATURE_STATS[key]) {
+                    displayValue += " " + NATURE_STATS[key];
+                }
+                option.value = displayValue;
+                list.appendChild(option);
+            });
+        }
+
+        // === 2. フォーム生成 ===
+        const form = document.getElementById('pokepaste-form');
+        const STAT_LABELS = ['H', 'A', 'B', 'C', 'D', 'S'];
+        const STAT_MAP = {'H':'HP', 'A':'Atk', 'B':'Def', 'C':'SpA', 'D':'SpD', 'S':'Spe'};
+        const REV_STAT_MAP = {'HP':'H', 'Atk':'A', 'Def':'B', 'SpA':'C', 'SpD':'D', 'Spe':'S'};
+        
+        let currentTargetIndex = 1;
+        let currentMode = 'individual'; // 'individual' or 'bulk_pokepaste'
+
+        for (let i = 1; i <= 6; i++) {
+            const section = document.createElement('div');
+            section.className = 'pokemon-section';
+            
+            let evInputs = '';
+            STAT_LABELS.forEach(stat => {
+                const ph = (stat === 'H' || stat === 'A') ? '252' : '0';
+                evInputs += `<div class="stat-item"><label>${stat}</label><input type="number" class="ev-input" name="ev-${stat}-${i}" placeholder="${ph}" min="0" max="252" step="4"></div>`;
+            });
+
+            let ivInputs = '';
+            STAT_LABELS.forEach(stat => {
+                ivInputs += `<div class="stat-item"><label>${stat}</label><input type="number" class="iv-input" name="iv-${stat}-${i}" value="31" min="0" max="31"></div>`;
+            });
+
+            section.innerHTML = `
+                <div class="individual-import-btn" onclick="openModal(${i}, 'individual')" title="ポケソルテキストを読み込む">
+                    <img src="image.png" alt="Paste" class="import-btn-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                    <div class="import-fallback" style="display:none;">📋</div>
+                </div>
+
+                <h2>ポケモン ${i}</h2>
+                
+                <div class="form-group">
+                    <label>ポケモン名 *</label>
+                    <input type="text" id="name-${i}" list="list-pokemon" placeholder="例: カイリュー">
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>特性</label>
+                        <input type="text" id="ability-${i}" list="list-abilities" placeholder="例: マルチスケイル">
+                    </div>
+                    <div class="form-group">
+                        <label>持ち物</label>
+                        <input type="text" id="item-${i}" list="list-items" placeholder="例: こだわりハチマキ">
+                    </div>
+                    <div class="form-group">
+                        <label>性格</label>
+                        <input type="text" id="nature-${i}" list="list-natures" placeholder="例: いじっぱり">
+                    </div>
+                    <div class="form-group">
+                        <label>テラスタイプ</label>
+                        <input type="text" id="tera-${i}" list="list-types" placeholder="例: ノーマル">
+                    </div>
+                </div>
+
+                <div class="stats-container">
+                    <div class="stats-block">
+                        <h3>努力値 (EVs) <span id="ev-total-${i}" style="font-size:0.85em; font-weight:normal; margin-left:5px; color:#aaa;">(0/510)</span></h3>
+                        <div class="stat-input-grid">${evInputs}</div>
+                    </div>
+                    <div class="stats-block"><h3>個体値 (IVs)</h3><div class="stat-input-grid">${ivInputs}</div></div>
+                </div>
+                <div class="form-group"><label>技構成 *</label>
+                    <div class="move-grid">
+                        <input type="text" id="move-1-${i}" list="list-moves" placeholder="技1">
+                        <input type="text" id="move-2-${i}" list="list-moves" placeholder="技2">
+                        <input type="text" id="move-3-${i}" list="list-moves" placeholder="技3">
+                        <input type="text" id="move-4-${i}" list="list-moves" placeholder="技4">
+                    </div>
+                </div>
+            `;
+            form.appendChild(section);
+        }
+
+        // === 3. インポート機能 ===
+        const modal = document.getElementById('import-modal');
+        const closeBtn = document.getElementById('close-modal');
+        const runBtn = document.getElementById('run-import');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const importText = document.getElementById('import-text');
+
+        window.openModal = function(index, mode) {
+            currentMode = mode;
+            currentTargetIndex = index;
+            importText.value = '';
+
+            if (mode === 'bulk_pokepaste') {
+                modalTitle.textContent = "PokéPaste一括読み込み";
+                modalDesc.textContent = "英語のPokéPasteテキストを貼り付けてください（最大6匹まで）";
+                importText.placeholder = "Dragonite @ Choice Band\nAbility: Multiscale\n...";
+            } else {
+                modalTitle.textContent = `ポケモン ${index} のテキスト読み込み`;
+                modalDesc.textContent = "日本語のポケソルテキストを入力";
+                importText.placeholder = "カイリュー @ こだわりハチマキ\n特性: マルチスケイル\n...";
+            }
+            modal.style.display = 'flex';
+        }
+
+        // ★ sd.png ボタンのクリックイベント
+        document.getElementById('open-pokepaste-btn').addEventListener('click', () => {
+            openModal(1, 'bulk_pokepaste');
+        });
+
+        closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+        runBtn.addEventListener('click', () => {
+            const text = importText.value;
+            if(!text.trim()) {
+                alert("テキストが入力されていません");
+                return;
+            }
+
+            if (currentMode === 'bulk_pokepaste') {
+                parseAndFillPokePasteBulk(text);
+            } else {
+                parseAndFillOnePokemon(text, currentTargetIndex);
+            }
+            modal.style.display = 'none';
+        });
+
+        // ★ 努力値合計を更新する関数
+        function updateEVTotal(idx) {
+            let total = 0;
+            STAT_LABELS.forEach(stat => {
+                const val = document.querySelector(`input[name="ev-${stat}-${idx}"]`).value;
+                total += parseInt(val) || 0;
+            });
+            
+            const span = document.getElementById(`ev-total-${idx}`);
+            if (span) {
+                span.textContent = `(${total}/510)`;
+                // 510なら青太字、それ以外はデフォルト色
+                if (total === 510) {
+                    span.style.color = '#2a64a3';
+                    span.style.fontWeight = 'bold';
+                } else {
+                    span.style.color = '#aaa';
+                    span.style.fontWeight = 'normal';
+                }
+            }
+        }
+
+        // PokéPaste (英語) 一括読み込み
+        function parseAndFillPokePasteBulk(text) {
+            const blocks = text.split(/\n\s*\n/);
+            let count = 0;
+
+            for (let i = 0; i < blocks.length && i < 6; i++) {
+                const block = blocks[i].trim();
+                if (!block) continue;
+                
+                const idx = i + 1;
+                const lines = block.split('\n');
+                
+                let name = '', item = '', ability = '', tera = '', nature = '';
+                let evs = {}; 
+                let ivs = {};
+                let moves = [];
+
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (!line) return;
+
+                    if (!name && !item && !line.includes(':') && !line.startsWith('-')) {
+                        if (line.includes('@')) {
+                            const parts = line.split('@');
+                            name = parts[0].trim();
+                            item = parts[1].trim();
+                        } else {
+                            name = line.trim();
+                        }
+                    }
+                    else if (line.startsWith('Ability:')) {
+                        ability = line.split(':')[1].trim();
+                    }
+                    else if (line.startsWith('Tera Type:')) {
+                        tera = line.split(':')[1].trim();
+                    }
+                    else if (line.endsWith('Nature')) {
+                        nature = line.replace('Nature', '').trim();
+                    }
+                    else if (line.startsWith('EVs:')) {
+                        const parts = line.split(':')[1].split('/');
+                        parts.forEach(p => {
+                            p = p.trim();
+                            const match = p.match(/^(\d+)\s+(\w+)/);
+                            if (match) {
+                                const val = match[1];
+                                const statName = match[2];
+                                const statKey = REV_STAT_MAP[statName];
+                                if (statKey) evs[statKey] = val;
+                            }
+                        });
+                    }
+                    else if (line.startsWith('IVs:')) {
+                        const parts = line.split(':')[1].split('/');
+                        parts.forEach(p => {
+                            p = p.trim();
+                            const match = p.match(/^(\d+)\s+(\w+)/);
+                            if (match) {
+                                const val = match[1];
+                                const statName = match[2];
+                                const statKey = REV_STAT_MAP[statName];
+                                if (statKey) ivs[statKey] = val;
+                            }
+                        });
+                    }
+                    else if (line.startsWith('-')) {
+                        const m = line.substring(1).trim();
+                        if (moves.length < 4) moves.push(m);
+                    }
+                });
+
+                let searchName = name;
+                searchName = searchName.replace(/\s*\([MF]\)$/, '').trim();
+                if (searchName.endsWith(')') && searchName.includes('(')) {
+                    const match = searchName.match(/\(([^)]+)\)$/); 
+                    if(match) {
+                        searchName = match[1];
+                    }
+                }
+                
+                document.getElementById(`name-${idx}`).value = reverseTranslate(searchName, 'pokemon');
+
+                if (item) document.getElementById(`item-${idx}`).value = reverseTranslate(item, 'items');
+                if (ability) document.getElementById(`ability-${idx}`).value = reverseTranslate(ability, 'abilities');
+                if (tera) document.getElementById(`tera-${idx}`).value = reverseTranslate(tera, 'types');
+                
+                // 性格 (補正情報付きでセット)
+                const jpNature = reverseTranslate(nature, 'natures');
+                if (NATURE_STATS[jpNature]) {
+                    document.getElementById(`nature-${idx}`).value = jpNature + " " + NATURE_STATS[jpNature];
+                } else {
+                    document.getElementById(`nature-${idx}`).value = jpNature;
+                }
+
+                // EVs (合計510制限)
+                let currentTotalEV = 0;
+                STAT_LABELS.forEach(stat => { 
+                    const input = document.querySelector(`input[name="ev-${stat}-${idx}"]`);
+                    input.value = ''; 
+                    if (evs[stat]) {
+                        let val = parseInt(evs[stat]);
+                        if (val > 252) val = 252;
+                        if (currentTotalEV + val > 510) {
+                            val = 510 - currentTotalEV;
+                        }
+                        if (val > 0) {
+                            input.value = val;
+                            currentTotalEV += val;
+                        }
+                    }
+                });
+                updateEVTotal(idx); // ★ 合計表示更新
+
+                STAT_LABELS.forEach(stat => { document.querySelector(`input[name="iv-${stat}-${idx}"]`).value = '31'; });
+                Object.keys(ivs).forEach(stat => {
+                    document.querySelector(`input[name="iv-${stat}-${idx}"]`).value = ivs[stat];
+                });
+
+                for(let m=0; m<4; m++) {
+                    const moveInput = document.getElementById(`move-${m+1}-${idx}`);
+                    moveInput.value = '';
+                    if (moves[m]) {
+                        moveInput.value = reverseTranslate(moves[m], 'moves');
+                    }
+                }
+                count++;
+            }
+            alert(`${count}匹分のPokéPasteを読み込みました！`);
+        }
+
+        // ポケソル (日本語) 個別読み込み
+        function parseAndFillOnePokemon(text, idx) {
+            const lines = text.trim().split('\n');
+            let name = '', item = '', ability = '', tera = '', nature = '';
+            let evs = {}; 
+            let ivs = {}; 
+            let moves = [];
+
+            lines.forEach(line => {
+                line = line.trim();
+                if(!line) return;
+
+                if (line.includes('@')) {
+                    const parts = line.split('@');
+                    name = parts[0].trim();
+                    item = parts[1].trim();
+                } 
+                else if (line.match(/^(特性|Ability)[:：]\s*(.+)$/i)) {
+                    ability = line.match(/^(特性|Ability)[:：]\s*(.+)$/i)[2];
+                } 
+                else if (line.match(/^(テラスタイプ|Tera Type)[:：]\s*(.+)$/i)) {
+                    tera = line.match(/^(テラスタイプ|Tera Type)[:：]\s*(.+)$/i)[2];
+                } 
+                else if (line.match(/^(性格|Nature)[:：]\s*(.+)$/i)) {
+                    nature = line.match(/^(性格|Nature)[:：]\s*(.+)$/i)[2];
+                }
+                else if (line.match(/\d+[\s-]+\d+/)) {
+                    const ivMatch = line.match(/\*([HABCDS])(\d+)/g);
+                    if (ivMatch) {
+                        ivMatch.forEach(m => {
+                            const statChar = m.charAt(1); 
+                            const val = m.substring(2);
+                            ivs[statChar] = val;
+                        });
+                    }
+                    const statOrder = ['H', 'A', 'B', 'C', 'D', 'S'];
+                    const parts = line.split(/[\s-]+/); 
+                    let statIndex = 0;
+                    parts.forEach(part => {
+                        const match = part.match(/\((\d+)\)/);
+                        if (match && statIndex < 6) evs[statOrder[statIndex]] = match[1];
+                        if (part.match(/^\d/)) statIndex++;
+                    });
+                } 
+                else if (line.includes('/') || (!line.match(/[0-9]+/) && line.length > 1)) {
+                    if(line.includes('/')) {
+                        const splitted = line.split('/');
+                        splitted.forEach(m => moves.push(m.trim()));
+                    } else if(moves.length < 4) {
+                        moves.push(line);
+                    }
+                }
+                else if (!name && !item && !line.includes(':') && !line.match(/[0-9]+/)) {
+                    name = line;
+                }
+            });
+
+            if(name) document.getElementById(`name-${idx}`).value = name;
+            if(item) document.getElementById(`item-${idx}`).value = item;
+            if(ability) document.getElementById(`ability-${idx}`).value = ability;
+            if(tera) document.getElementById(`tera-${idx}`).value = tera;
+            
+            // ★ 性格 (補正情報付きでセット)
+            if (NATURE_STATS[nature]) {
+                document.getElementById(`nature-${idx}`).value = nature + " " + NATURE_STATS[nature];
+            } else {
+                document.getElementById(`nature-${idx}`).value = nature;
+            }
+
+            // EVs (合計510制限)
+            let currentTotalEV = 0;
+            STAT_LABELS.forEach(stat => { 
+                const input = document.querySelector(`input[name="ev-${stat}-${idx}"]`);
+                input.value = ''; 
+                if (evs[stat]) {
+                    let val = parseInt(evs[stat]);
+                    if (val > 252) val = 252;
+                    if (currentTotalEV + val > 510) {
+                        val = 510 - currentTotalEV;
+                    }
+                    if (val > 0) {
+                        input.value = val;
+                        currentTotalEV += val;
+                    }
+                }
+            });
+            updateEVTotal(idx); // ★ 合計表示更新
+
+            STAT_LABELS.forEach(stat => { document.querySelector(`input[name="iv-${stat}-${idx}"]`).value = '31'; });
+            Object.keys(ivs).forEach(stat => {
+                const input = document.querySelector(`input[name="iv-${stat}-${idx}"]`);
+                if(input) input.value = ivs[stat];
+            });
+
+            for(let m=0; m<4; m++) {
+                document.getElementById(`move-${m+1}-${idx}`).value = '';
+            }
+            for(let m=0; m<4 && m<moves.length; m++) {
+                document.getElementById(`move-${m+1}-${idx}`).value = moves[m];
+            }
+        }
+
+        // === 4. 基本機能 (入力制限, 翻訳生成) ===
+        document.querySelectorAll('.ev-input').forEach(input => {
+            // キーボード矢印操作
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    let val = parseInt(this.value) || 0;
+                    let next;
+                    if (e.key === 'ArrowUp') {
+                        if (val < 4) next = 4;
+                        else if (val >= 252) next = 252;
+                        else { let rem = (val - 4) % 8; next = (rem === 0) ? val + 8 : val + (8 - rem); }
+                        if (next > 252) next = 252;
+                    } else {
+                        if (val <= 4) next = 0;
+                        else { let rem = (val - 4) % 8; next = (rem === 0) ? val - 8 : val - rem; }
+                        if (next < 0) next = 0;
+                    }
+                    this.value = next;
+                    this.dispatchEvent(new Event('input')); // 入力イベントを手動発火
+                }
+            });
+
+            // 手動入力制限 (252制限 & 510制限)
+            input.addEventListener('input', function() {
+                if (this.value === '') {
+                    updateEVTotal(this.name.split('-')[2]); // 空でも合計更新
+                    return;
+                }
+
+                let val = parseInt(this.value);
+                if (isNaN(val)) return;
+
+                if (val < 0) val = 0;
+                if (val > 252) val = 252;
+
+                const parts = this.name.split('-');
+                const index = parts[2];
+                let otherTotal = 0;
+                document.querySelectorAll(`.ev-input[name$="-${index}"]`).forEach(el => {
+                    if (el !== this) {
+                        otherTotal += parseInt(el.value) || 0;
+                    }
+                });
+
+                const maxAllowed = 510 - otherTotal;
+                if (val > maxAllowed) {
+                    val = maxAllowed;
+                }
+
+                if (parseInt(this.value) !== val) {
+                    this.value = val;
+                }
+                
+                // ★ 合計表示を更新
+                updateEVTotal(index);
+            });
+        });
+
+        document.querySelectorAll('.iv-input').forEach(input => {
+            input.addEventListener('input', function() { if(this.value > 31) this.value = 31; });
+        });
+
+        function translate(text, type) {
+            if (!text) return '';
+            
+            // ★ 性格の場合、補正情報を除去して検索
+            if (type === 'natures') {
+                text = text.split(' ')[0];
+            }
+
+            if (typeof TRANSLATION_DATA === 'undefined') return text;
+            const dict = TRANSLATION_DATA[type];
+            return (dict && dict[text]) ? dict[text] : text;
+        }
+
+        document.getElementById('generate-button').addEventListener('click', () => {
+            let fullOutput = '';
+            for (let i = 1; i <= 6; i++) {
+                const jpName = document.getElementById(`name-${i}`).value.trim();
+                if (!jpName) continue;
+
+                const enName = translate(jpName, 'pokemon');
+                const jpItem = document.getElementById(`item-${i}`).value.trim();
+                const enItem = translate(jpItem, 'items');
+                
+                let block = `${enName}`;
+                if (enItem) block += ` @ ${enItem}`;
+                block += '\n';
+
+                const jpAbility = document.getElementById(`ability-${i}`).value.trim();
+                if (jpAbility) block += `Ability: ${translate(jpAbility, 'abilities')}\n`;
+
+                block += `Level: 50\n`;
+
+                const jpTera = document.getElementById(`tera-${i}`).value.trim();
+                if (jpTera) block += `Tera Type: ${translate(jpTera, 'types')}\n`;
+
+                let evsList = [];
+                STAT_LABELS.forEach(stat => {
+                    const val = document.querySelector(`input[name="ev-${stat}-${i}"]`).value;
+                    if (val && parseInt(val) > 0) evsList.push(`${val} ${STAT_MAP[stat]}`);
+                });
+                if (evsList.length > 0) block += `EVs: ${evsList.join(' / ')}\n`;
+
+                const jpNature = document.getElementById(`nature-${i}`).value.trim();
+                if (jpNature) block += `${translate(jpNature, 'natures')} Nature\n`;
+
+                let ivsList = [];
+                STAT_LABELS.forEach(stat => {
+                    const val = document.querySelector(`input[name="iv-${stat}-${i}"]`).value;
+                    if (val !== '' && parseInt(val) !== 31) ivsList.push(`${val} ${STAT_MAP[stat]}`);
+                });
+                if (ivsList.length > 0) block += `IVs: ${ivsList.join(' / ')}\n`;
+
+                for (let m = 1; m <= 4; m++) {
+                    const jpMove = document.getElementById(`move-${m}-${i}`).value.trim();
+                    if (jpMove) block += `- ${translate(jpMove, 'moves')}\n`;
+                }
+                fullOutput += block + '\n';
+            }
+            document.getElementById('output-code').value = fullOutput.trim();
+        });
+
+        document.getElementById('copy-button').addEventListener('click', () => {
+            document.getElementById("output-code").select();
+            document.execCommand("copy");
+            alert("コピーしました！");
+        });
+    </script>
+</body>
+</html>
