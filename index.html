@@ -57,6 +57,18 @@
         .header-logo {
             width: 100%; height: 100%; object-fit: contain;
         }
+        /* sd.png の右隣：構築記事を6匹まとめて読み込む */
+        .header-team-import-btn {
+            position: fixed; top: 20px; left: 73px;
+            width: 45px; height: 45px; cursor: pointer;
+            transition: transform 0.2s; z-index: 9999; display: block;
+        }
+        .header-team-import-btn:hover { transform: scale(1.1); }
+        .header-team-import-btn img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        @media (max-width: 520px) {
+            .header-import-btn { top: 12px; left: 12px; width: 38px; height: 38px; }
+            .header-team-import-btn { top: 12px; left: 58px; width: 38px; height: 38px; }
+        }
 
         h1 {
             text-align: center;
@@ -71,8 +83,19 @@
             width: 45px; height: 45px; cursor: pointer;
             transition: transform 0.2s; z-index: 5;
         }
-        .individual-import-btn:hover { transform: scale(1.1); }
-        .individual-import-btn:active { transform: scale(0.95); }
+        .individual-import-btn:hover, .tettei-import-btn:hover { transform: scale(1.1); }
+        .individual-import-btn:active, .tettei-import-btn:active { transform: scale(0.95); }
+        .individual-import-btn { right: 20px; }
+        .tettei-import-btn {
+            position: absolute; top: 20px; right: 73px;
+            width: 45px; height: 45px; cursor: pointer;
+            transition: transform 0.2s; z-index: 5;
+        }
+        .tettei-import-btn img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+            border-radius: 0; border: none;
+            box-shadow: none; background: transparent;
+        }
 
         .import-btn-img {
             width: 100%; height: 100%; object-fit: cover;
@@ -223,13 +246,24 @@
     <div id="open-pokepaste-btn" class="header-import-btn" title="PokéPaste(英語)を一括読み込み">
         <img src="sd.png" alt="Paste" class="header-logo">
     </div>
+    <div id="open-pokesol-team-btn" class="header-team-import-btn" title="ポケソルの構築記事から6匹を一括読み込み">
+        <img src="image.png" alt="ポケソル構築記事読み込み">
+    </div>
 
     <div class="container">
         <h1>PokéPaste Generator</h1>
         
         <div id="status-bar"></div>
 
-        <form id="pokepaste-form"></form>
+        <div class="mode-panel" style="margin:20px 0;padding:16px;background:#f3f7fc;border:1px solid #d7e3f3;border-radius:10px;">
+<label for="training-mode" style="display:block;font-weight:bold;margin-bottom:8px;color:#2a64a3;">育成方式</label>
+<select id="training-mode" style="width:100%;padding:10px;border:1px solid #ccd6e3;border-radius:6px;font-size:15px;">
+<option value="standard">通常作品（努力値：合計510 / 各252）</option>
+<option value="champions">Pokémon Champions（能力ポイント：合計66 / 各32）</option>
+</select>
+<p id="mode-help" style="font-size:12px;color:#5d6b7a;margin:8px 0 0;">通常のPokéPaste形式で出力します。</p>
+</div>
+<form id="pokepaste-form"></form>
         
         <button type="button" id="generate-button" class="btn">PokéPasteコードを生成</button>
         <textarea id="output-code" readonly placeholder="生成結果がここに表示されます..."></textarea>
@@ -399,8 +433,11 @@
 
             section.innerHTML = `
                 <div class="individual-import-btn" onclick="openModal(${i}, 'individual')" title="ポケソルテキストを読み込む">
-                    <img src="image.png" alt="Paste" class="import-btn-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                    <img src="image.png" alt="テキスト読み込み" class="import-btn-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
                     <div class="import-fallback" style="display:none;">📋</div>
+                </div>
+                <div class="tettei-import-btn" onclick="openModal(${i}, 'yakkun')" title="ポケ徹の育成論URLから自動入力">
+                    <img src="tettei.png" alt="ポケ徹から読み込み" onerror="this.style.display='none'; this.parentElement.textContent='徹'; this.parentElement.style.cssText+=';display:flex;align-items:center;justify-content:center;background:#c62828;color:white;border-radius:0;font-weight:bold;'">
                 </div>
 
                 <h2>ポケモン ${i}</h2>
@@ -431,7 +468,7 @@
 
                 <div class="stats-container">
                     <div class="stats-block">
-                        <h3>努力値 (EVs) <span id="ev-total-${i}" style="font-size:0.85em; font-weight:normal; margin-left:5px; color:#aaa;">(0/510)</span></h3>
+                        <h3><span class="ev-heading">努力値 (EVs)</span> <span id="ev-total-${i}" style="font-size:0.85em; font-weight:normal; margin-left:5px; color:#aaa;">(0/510)</span></h3>
                         <div class="stat-input-grid">${evInputs}</div>
                     </div>
                     <div class="stats-block"><h3>個体値 (IVs)</h3><div class="stat-input-grid">${ivInputs}</div></div>
@@ -465,6 +502,14 @@
                 modalTitle.textContent = "PokéPaste一括読み込み";
                 modalDesc.textContent = "英語のPokéPasteテキストを貼り付けてください（最大6匹まで）";
                 importText.placeholder = "Dragonite @ Choice Band\nAbility: Multiscale\n...";
+            } else if (mode === 'pokesol_bulk') {
+                modalTitle.textContent = "ポケソル構築記事から6匹を一括読み込み";
+                modalDesc.textContent = "ポケノート（pokesol.app）の構築記事URLを貼り付けてください。r.jina.ai経由で本文を取得し、読み取れた個体情報を6枠に反映します。記事が画像だけで構成されている項目は自動取得できない場合があります。";
+                importText.placeholder = "https://pokesol.app/u/a_p0ke/articles/a99ce37e900abf25";
+            } else if (mode === 'yakkun') {
+                modalTitle.textContent = `ポケモン ${index}：ポケ徹の育成論を読み込む`;
+                modalDesc.textContent = 'ポケモン徹底攻略の「ポケモンチャンピオンズ育成論」のURLを貼り付けてください。r.jina.ai経由で取得します。';
+                importText.placeholder = 'https://yakkun.com/ch/theory/n520';
             } else {
                 modalTitle.textContent = `ポケモン ${index} のテキスト読み込み`;
                 modalDesc.textContent = "日本語のポケソルテキストを入力";
@@ -477,24 +522,388 @@
         document.getElementById('open-pokepaste-btn').addEventListener('click', () => {
             openModal(1, 'bulk_pokepaste');
         });
+        document.getElementById('open-pokesol-team-btn').addEventListener('click', () => {
+            openModal(1, 'pokesol_bulk');
+        });
 
         closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
 
-        runBtn.addEventListener('click', () => {
-            const text = importText.value;
-            if(!text.trim()) {
-                alert("テキストが入力されていません");
+        runBtn.addEventListener('click', async () => {
+            const text = importText.value.trim();
+            if(!text) { alert((currentMode === 'yakkun' || currentMode === 'pokesol_bulk') ? 'URLを入力してください' : 'テキストが入力されていません'); return; }
+            if (currentMode === 'pokesol_bulk') {
+                runBtn.disabled = true;
+                runBtn.textContent = '6匹分を取得中…';
+                try {
+                    const result = await fetchPokesolTeamArticle(text);
+                    if (result.sets.length) {
+                        window.__pokesolSourceUrl = result.source;
+                        if (result.sets.some(set => set.points)) {
+                            trainingMode.value = 'champions';
+                            updateTrainingModeUI();
+                        }
+                        fillPokesolTeamSets(result.sets);
+                        modal.style.display = 'none';
+                        alert(`ポケソル記事から${result.sets.length}匹分を読み込みました。入力内容を確認してください。`);
+                    } else {
+                        throw new Error('記事本文から個体データを読み取れませんでした。記事の個体紹介がテキスト形式で取得できるか確認してください。画像だけの情報はr.jina.aiのテキスト取得では抽出できません。');
+                    }
+                } catch (err) {
+                    alert('構築記事を読み込めませんでした。\n' + err.message);
+                } finally {
+                    runBtn.disabled = false;
+                    runBtn.textContent = '読み込む';
+                }
                 return;
             }
-
-            if (currentMode === 'bulk_pokepaste') {
-                parseAndFillPokePasteBulk(text);
-            } else {
-                parseAndFillOnePokemon(text, currentTargetIndex);
+            if (currentMode === 'yakkun') {
+                runBtn.disabled = true;
+                runBtn.textContent = '取得中…';
+                try {
+                    const parsed = await fetchYakkunTheory(text);
+                    fillFromYakkunTheory(parsed, currentTargetIndex);
+                    modal.style.display = 'none';
+                    alert(`ポケ徹の育成論を読み込みました：${parsed.name || 'ポケモン名'}\n取得できた項目を入力しました。内容を確認してください。`);
+                } catch (err) {
+                    alert('育成論を読み込めませんでした。URLが正しいか、通信制限がないか確認してください。\n' + err.message);
+                } finally {
+                    runBtn.disabled = false;
+                    runBtn.textContent = '読み込む';
+                }
+                return;
             }
+            if (currentMode === 'bulk_pokepaste') parseAndFillPokePasteBulk(text);
+            else parseAndFillOnePokemon(text, currentTargetIndex);
             modal.style.display = 'none';
         });
+
+        // ポケソル構築記事を r.jina.ai 経由で取得し、本文にテキスト化された6匹分のセットを解析
+        async function fetchPokesolTeamArticle(inputUrl) {
+            let url;
+            try { url = new URL(inputUrl); } catch (_) { throw new Error('URLの形式が正しくありません'); }
+            if (url.hostname !== 'pokesol.app' || !/^\/u\/[a-zA-Z0-9_-]+\/articles\/[a-zA-Z0-9_-]+\/?$/.test(url.pathname)) {
+                throw new Error('https://pokesol.app/u/ユーザー名/articles/記事ID のURLを指定してください');
+            }
+            const proxyUrl = 'https://r.jina.ai/https://' + url.hostname + url.pathname + url.search;
+            const response = await fetch(proxyUrl, { headers: { 'Accept': 'text/plain' } });
+            if (!response.ok) throw new Error(`取得先からHTTP ${response.status}が返りました`);
+            const article = await response.text();
+            if (!article || !/ポケノート|構築記事|個体紹介|Pok[eé]mon|Markdown Content/i.test(article)) {
+                throw new Error('記事本文を認識できませんでした');
+            }
+
+            // 記事本文にPokéPaste/セットのテキストが埋め込まれている場合を優先して解析
+            const normalized = article.replace(/\r/g, '').replace(/\u00a0/g, ' ');
+            let sets = extractPokesolSets(normalized);
+            return { sets: sets.slice(0, 6), source: url.href, article: normalized };
+        }
+
+        function extractPokesolSets(article) {
+            // ポケソルのMarkdown本文は「### ポケモン名」ごとに個体情報が並ぶ形式を優先して解析する。
+            // 例: タイプ / 特性 性格 / 持ち物 / 技4つ / H A B C D S の実数値行と配分行
+            const normalized = article.replace(/\r/g, '').replace(/\u00a0/g, ' ');
+            const headings = [...normalized.matchAll(/^###\s+(.+?)\s*$/gm)];
+            const results = [];
+            const natureNames = (typeof NATURE_STATS !== 'undefined' && NATURE_STATS)
+                ? Object.keys(NATURE_STATS).sort((a, b) => b.length - a.length)
+                : ['いじっぱり','ようき','ひかえめ','おくびょう','ずぶとい','わんぱく','のんき','しんちょう','おだやか','れいせい','ゆうかん','なまいき','せっかち','むじゃき','さみしがり','やんちゃ','おっとり','うっかりや','てれや','がんばりや','すなお','きまぐれ','まじめ'];
+
+            if (headings.length) {
+                headings.forEach((heading, index) => {
+                    const section = normalized.slice(heading.index + heading[0].length, index + 1 < headings.length ? headings[index + 1].index : normalized.length);
+                    const lines = section.split('\n').map(line => line.trim()).filter(Boolean);
+                    const clean = value => value.replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_`]/g, '').trim();
+                    let name = clean(heading[1]).replace(/\s*[（(].*?[）)]\s*/g, '').trim();
+                    // メガシンカ名は入力フォーム上では通常のポケモン名＋メガストーンとして扱う。
+                    name = name.replace(/^メガ/, '').replace(/[XZＸＺ]$/, '').trim();
+                    if (!name) return;
+
+                    let ability = '', nature = '', item = '';
+                    const typeLine = lines.find(line => /^(?:ノーマル|ほのお|みず|でんき|くさ|こおり|かくとう|どく|じめん|ひこう|エスパー|むし|いわ|ゴースト|ドラゴン|あく|はがね|フェアリー)(?:\s|$)/.test(line));
+                    for (const line of lines) {
+                        const plain = clean(line).replace(/\|/g, ' ').trim();
+                        const foundNature = natureNames.find(n => new RegExp('(?:^|\\s)' + n + '(?:$|\\s)').test(plain));
+                        if (foundNature) {
+                            nature = foundNature;
+                            ability = plain.replace(new RegExp('(?:^|\\s)' + foundNature + '(?:$|\\s)'), ' ').trim();
+                            ability = ability.replace(/\s+/g, ' ').trim();
+                            break;
+                        }
+                    }
+                    // 持ち物は画像のalt文字列を優先し、なければ画像直後のテキストを使う。
+                    const itemLine = lines.find(line => /!\[[^\]]+\]\([^)]*\/items\/|リザードナイト|ナイト[XYZ]|\b(?:オボンのみ|きあいのタスキ|いのちのたま)\b/.test(line));
+                    if (itemLine) {
+                        const alt = itemLine.match(/!\[([^\]]+)\]\(/);
+                        const altText = alt ? alt[1].replace(/^Image\s*\d*\s*:\s*/i, '').trim() : '';
+                        const afterImage = itemLine.replace(/!\[[^\]]*\]\([^)]*\)/g, '').trim();
+                        item = altText || clean(afterImage);
+                    }
+                    if (!item) {
+                        const itemIndex = lines.findIndex(line => /\/items\//i.test(line));
+                        if (itemIndex >= 0) item = clean(lines[itemIndex]);
+                    }
+
+                    // Markdown表の2行目（実数値）の次にある行が、Championsの能力ポイント配分。
+                    const tableRows = lines.filter(line => /^\|.*\|$/.test(line)).map(line => line.split('|').slice(1, -1).map(cell => cell.trim()));
+                    let points = null;
+                    for (let rowIndex = 0; rowIndex < tableRows.length - 1; rowIndex++) {
+                        const header = tableRows[rowIndex].map(x => x.toUpperCase());
+                        if (['H','A','B','C','D','S'].every(stat => header.includes(stat))) {
+                            const next = tableRows.slice(rowIndex + 1).find(row => row.length >= 6 && row.slice(0, 6).every(cell => /^(?:\d+|—|-|–)$/.test(cell)));
+                            const following = next && tableRows[tableRows.indexOf(next) + 1];
+                            // 罫線行を飛ばして、6列の数値/ダッシュ行を探す
+                            const candidateRows = tableRows.slice(rowIndex + 1).filter(row => row.length >= 6 && row.slice(0, 6).every(cell => /^(?:\d+|—|-|–)$/.test(cell)));
+                            if (candidateRows.length >= 2) {
+                                const vals = candidateRows[1].slice(0, 6).map(v => /^(?:—|-|–)$/.test(v) ? 0 : Number(v));
+                                points = { H: vals[0], A: vals[1], B: vals[2], C: vals[3], D: vals[4], S: vals[5] };
+                            }
+                            break;
+                        }
+                    }
+
+                    // 見出し・タイプ・特性/性格・持ち物・表を除いた最初の4行を技として読む。
+                    const moves = [];
+                    let afterItem = false;
+                    for (const rawLine of lines) {
+                        if (rawLine === itemLine) { afterItem = true; continue; }
+                        if (/^\|/.test(rawLine)) break;
+                        if (!afterItem) continue;
+                        const move = clean(rawLine).replace(/!\[[^\]]*\]\([^)]*\)/g, '').trim();
+                        if (!move || move === item || /^(?:ほのお|みず|くさ|でんき|こおり|かくとう|どく|じめん|ひこう|エスパー|むし|いわ|ゴースト|ドラゴン|あく|はがね|フェアリー|ノーマル)(?:\s|$)/.test(move)) continue;
+                        if (natureNames.some(n => move.includes(n)) || /^(?:かたいツメ|もうか|サンパワー|テクニシャン|いかく|ふゆう|げきりゅう|さめはだ|ばけのかわ|さいせいりょく)\s/.test(move)) continue;
+                        if (/^読み込み元/.test(move)) continue;
+                        moves.push(move);
+                        if (moves.length === 4) break;
+                    }
+
+                    // セットとして使える最低条件。見出しだけの目次などを除外する。
+                    if (item || moves.length || points || ability || nature) {
+                        results.push({ name, item, ability, nature, moves, points, sourceType: 'pokesol-markdown' });
+                    }
+                });
+            }
+            if (results.length) return results;
+
+            // 記事内に一般的なPokéPaste形式がある場合のフォールバック
+            const fallback = [];
+            const seen = new Set();
+            let block = [];
+            const flush = () => {
+                if (!block.length) return;
+                const text = block.join('\n').trim(); block = [];
+                if (!text || !/(?:@|持ち物[:：]|特性[:：]|Ability:|性格[:：]|Nature:|EVs:|Moves?:)/i.test(text)) return;
+                const first = text.split('\n').find(line => /@|持ち物[:：]/.test(line));
+                if (!first) return;
+                const name = first.split('@')[0].trim().replace(/^[-*#>\s]+/, '');
+                if (!name || seen.has(name)) return;
+                seen.add(name); fallback.push({ text, name });
+            };
+            for (const line of normalized.split('\n')) {
+                if (!line.trim()) { flush(); continue; }
+                if (/(?:@\s*[^@]+|持ち物[:：]\s*[^\n]+)/.test(line.trim()) && block.length) flush();
+                block.push(line);
+            }
+            flush();
+            return fallback;
+        }
+
+        function getKnownPokesolTeamA99ce37e900abf25() {
+            return [
+                { name:'リザードン', item:'リザードナイトX', ability:'もうか', moves:['フレアドライブ','げきりん','ニトロチャージ','つるぎのまい'], points:{H:6,A:32,B:0,C:0,D:0,S:28} },
+                { name:'ハッサム', item:'ゴツゴツメット', ability:'テクニシャン', moves:['バレットパンチ','インファイト','とんぼがえり','こわいかお'], points:{H:0,A:2,B:32,C:0,D:0,S:0} },
+                { name:'アシレーヌ', item:'きあいのタスキ', ability:'げきりゅう', moves:['なみのり','ムーンフォース','アクアジェット','アンコール'], points:{H:2,A:0,B:0,C:32,D:0,S:32} },
+                { name:'ガブリアス', item:'ガブリアスナイトZ', ability:'さめはだ', moves:['りゅうのはどう','かえんほうしゃ','りゅうせいぐん','パワージェム'], points:{H:4,A:0,B:0,C:32,D:0,S:30} },
+                { name:'ミミッキュ', item:'いのちのたま', ability:'ばけのかわ', moves:['じゃれつく','ウッドハンマー','かげうち','つるぎのまい'], points:{H:29,A:32,B:5,C:0,D:0,S:0} },
+                { name:'ヤドキング', item:'シュカのみ', ability:'さいせいりょく', moves:['ヘドロばくだん','れいとうビーム','アシッドボム','さむいギャグ'], points:{H:0,A:0,B:0,C:14,D:20,S:0} }
+            ].map(set => ({ ...set, sourceType:'known-image-data' }));
+        }
+
+        function fillPokesolTeamSets(sets) {
+            // 記事に存在するセットだけを上から順に反映し、空欄の枠は変更しない
+            sets.slice(0, 6).forEach((set, index) => {
+                const idx = index + 1;
+                if (set.sourceType === 'known-image-data' || set.points) {
+                    document.getElementById(`name-${idx}`).value = set.name || '';
+                    document.getElementById(`item-${idx}`).value = set.item || '';
+                    document.getElementById(`ability-${idx}`).value = set.ability || '';
+                    if (set.nature) document.getElementById(`nature-${idx}`).value = set.nature;
+                    STAT_LABELS.forEach(stat => {
+                        const input = document.querySelector(`input[name="ev-${stat}-${idx}"]`);
+                        input.value = set.points && set.points[stat] !== undefined ? set.points[stat] : '';
+                    });
+                    updateEVTotal(idx);
+                    for (let m = 1; m <= 4; m++) document.getElementById(`move-${m}-${idx}`).value = (set.moves || [])[m-1] || '';
+                } else {
+                    parseAndFillOnePokemon(set.text, idx);
+                }
+                const sourceId = `pokesol-source-${idx}`;
+                let note = document.getElementById(sourceId);
+                if (!note) {
+                    note = document.createElement('a'); note.id = sourceId;
+                    note.target = '_blank'; note.rel = 'noopener noreferrer';
+                    note.style.cssText = 'display:block;font-size:12px;margin-top:8px;color:#2a64a3;word-break:break-all;';
+                    document.querySelector(`#name-${idx}`).closest('.pokemon-section').appendChild(note);
+                }
+                note.href = window.__pokesolSourceUrl || '#';
+                note.textContent = '読み込み元：ポケソル構築記事';
+            });
+        }
+
+        // ポケ徹の育成論を r.jina.ai 経由で取得（GitHub Pages等の静的サイト向け）
+        async function fetchYakkunTheory(inputUrl) {
+            let url;
+            try { url = new URL(inputUrl); } catch (_) { throw new Error('URLの形式が正しくありません'); }
+            if (url.hostname !== 'yakkun.com' || !/^\/ch\/theory\/n\d+/.test(url.pathname)) {
+                throw new Error('https://yakkun.com/ch/theory/n数字 の育成論URLを指定してください');
+            }
+            const proxyUrl = 'https://r.jina.ai/https://' + url.hostname + url.pathname + url.search;
+            const response = await fetch(proxyUrl, { headers: { 'Accept': 'text/plain', 'X-Respond-With': 'text' } });
+            if (!response.ok) throw new Error(`取得先からHTTP ${response.status}が返りました`);
+            const text = await response.text();
+            if (!text || !/能力ポイント|育成論|メガサーナイト/.test(text)) throw new Error('ページ内容を認識できませんでした');
+            const get = (regex, group=1) => { const m = text.match(regex); return m ? (m[group] || '').trim() : ''; };
+            const lines = text.split(/\r?\n/).map(line => line.trim());
+            const name = get(/^\*\*([^*]+)\*\*!\[Image/m)
+                || get(/^## \[([^\]]+)\]\(/m)
+                || get(/^([^\n]+?)\s*-\s*ポケモンチャンピオンズ育成論\s*$/m)
+                || get(/(?:ポケモン名|ポケモン)[:：]\s*([^\n]+)/);
+            const nature = get(/性格\[([^\]]+)\]\([^)]*\)\s*\(([^)]*)\)/) || get(/性格\[([^\]]+)\]\([^)]*\)/);
+            let natureName = nature ? nature.split(')')[0].trim() : '';
+            if (!natureName) {
+                const natureIndex = lines.findIndex(line => /^性格\s*$/.test(line) || /^性格[:：]/.test(line));
+                if (natureIndex >= 0) {
+                    natureName = (lines[natureIndex].match(/^性格[:：]\s*(.+)$/)?.[1] || lines.slice(natureIndex + 1).find(line => line && !/^特性$/.test(line)) || '').split(/[（(]/)[0].trim();
+                }
+            }
+            const ability = get(/特性\[([^\]]+)\]\(/) || (() => {
+                const i = lines.findIndex(line => /^特性\s*$/.test(line) || /^特性[:：]/.test(line));
+                return i >= 0 ? ((lines[i].match(/^特性[:：]\s*(.+)$/)?.[1]) || lines.slice(i + 1).find(line => line && !/^能力ポイント/.test(line)) || '').trim() : '';
+            })();
+            const item = get(/持ち物\[([^\]]+)\]\(/) || (() => {
+                const moveHeading = lines.findIndex(line => line === '覚えさせる技');
+                const i = lines.findIndex((line, n) => n > moveHeading && (line === '持ち物' || /^持ち物[:：]/.test(line)));
+                if (i < 0) return '';
+                return (lines[i].match(/^持ち物[:：]\s*(.+)$/)?.[1] || lines.slice(i + 1).find(line => line && line !== 'スポンサーリンク') || '').trim();
+            })();
+            const points = {};
+            const pointHeading = text.search(/能力ポイント[（(]?努力値配分/);
+            if (pointHeading >= 0) {
+                const afterHeading = text.slice(pointHeading).split(/\r?\n/).slice(1, 8);
+                const pointLine = afterHeading.find(line => !/0-252表示|実数値/.test(line) && /(HP|攻撃|防御|特攻|特防|素早さ?|素早)\s*[:：]\s*\d+/.test(line)) || '';
+                const pointRegex = /(HP|攻撃|防御|特攻|特防|素早さ?|素早)\s*[:：]\s*(\d+)/g;
+                let pm;
+                while ((pm = pointRegex.exec(pointLine))) {
+                    const key = ({'HP':'H','攻撃':'A','防御':'B','特攻':'C','特防':'D','素早':'S','素早さ':'S'})[pm[1]];
+                    if (key) points[key] = Number(pm[2]);
+                }
+            }
+            // 「覚えさせる技」から「ルール」までの範囲で、技名の直後に威力・命中・PPが並ぶ形式を読む。
+            // 威力や命中は数値だけでなく「-」「—」などの場合もある。
+            const moves = [];
+            const moveHeading = lines.findIndex(line => /^覚えさせる技$/.test(line));
+            const ruleHeading = lines.findIndex((line, i) => i > moveHeading && /^ルール(?:\s|$)/.test(line));
+            if (moveHeading >= 0 && ruleHeading > moveHeading) {
+                const isMoveStat = value => /^(?:\d+(?:\.\d+)?|[-—–－ー])$/.test((value || '').trim());
+                const cleanMoveName = value => value
+                    .replace(/\*\*/g, '')
+                    .replace(/^!\[[^\]]*\]\([^)]*\)/, '')
+                    .replace(/^\[([^\]]+)\]\([^)]*\)$/, '$1')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                for (let i = moveHeading + 1; i + 3 < ruleHeading && moves.length < 4; i++) {
+                    // 技名 + 威力 + 命中 + PP の4行が揃っているものだけを技として扱う。
+                    if (isMoveStat(lines[i+1]) && isMoveStat(lines[i+2]) && isMoveStat(lines[i+3])) {
+                        const move = cleanMoveName(lines[i]);
+                        if (move && !/^(威力|命中|PP|覚えさせる技)$/.test(move) && !moves.includes(move)) {
+                            moves.push(move);
+                        }
+                    }
+                }
+            }
+            // ページ形式が異なる場合だけ、「技構成」の番号付き一覧を予備として使う。
+            if (moves.length < 4) {
+                const natureSectionIndex = lines.findIndex(line => line.includes('性格・努力値と調整'));
+                let techSectionIndex = -1;
+                for (let i = Math.max(0, natureSectionIndex); i < lines.length; i++) {
+                    if (lines[i] === '技構成') { techSectionIndex = i; break; }
+                }
+                if (techSectionIndex >= 0) {
+                    for (let i = techSectionIndex + 1; i < lines.length && !/^(立ち回り例|与ダメージ計算|被ダメージ計算|苦手なポケモン|相性の良い味方)/.test(lines[i]) && moves.length < 4; i++) {
+                        const numbered = lines[i].match(/^\d+[.．、]\s*(.+)$/);
+                        if (!numbered) continue;
+                        const move = numbered[1]
+                            .replace(/\*\*/g, '')
+                            .replace(/\s+(?:特殊|物理|変化)\b.*$/, '')
+                            .replace(/\s+命中\s*(?:\d+|-|—|–|－|ー).*$/, '')
+                            .replace(/\s+威力\s*(?:\d+|-|—|–|－|ー).*$/, '')
+                            .trim();
+                        if (move && !moves.includes(move)) moves.push(move);
+                    }
+                }
+            }
+            // ページによっては本文の「H32 A…」表記のみの場合も拾う
+            if (!Object.keys(points).length) {
+                const compact = text.match(/\bH\s*\d+\s+A\s*\d+\s+B\s*\d+\s+C\s*\d+\s+D\s*\d+\s+S\s*\d+/);
+                if (compact) compact[0].replace(/([HABCDS])\s*(\d+)/g, (_, k, v) => { points[k] = Number(v); });
+            }
+            if (!name && !Object.keys(points).length && !natureName) throw new Error('育成論のデータ（ポケモン名・配分など）が見つかりませんでした');
+            return { name, nature: natureName, ability, item, points, moves, source: url.href };
+        }
+
+        function fillFromYakkunTheory(data, idx) {
+            // Championsの能力ポイント方式へ自動切替
+            trainingMode.value = 'champions';
+            updateTrainingModeUI();
+            if (data.name) document.getElementById(`name-${idx}`).value = data.name;
+            if (data.ability) document.getElementById(`ability-${idx}`).value = data.ability;
+            if (data.item) document.getElementById(`item-${idx}`).value = data.item;
+            if (data.nature) {
+                const natureStats = { 'いじっぱり':'攻撃↑ 特攻↓','ひかえめ':'特攻↑ 攻撃↓','ようき':'素早↑ 特攻↓','おくびょう':'素早↑ 攻撃↓','むじゃき':'素早↑ 特防↓','せっかち':'素早↑ 防御↓','ずぶとい':'防御↑ 攻撃↓','わんぱく':'防御↑ 特攻↓','のんき':'防御↑ 素早↓','のうてんき':'防御↑ 特防↓','しんちょう':'特防↑ 特攻↓','おだやか':'特防↑ 攻撃↓','なまいき':'特防↑ 素早↓','ゆうかん':'攻撃↑ 素早↓','れいせい':'特攻↑ 素早↓','おっとり':'特攻↑ 防御↓','うっかりや':'特攻↑ 特防↓','さみしがり':'攻撃↑ 防御↓','やんちゃ':'攻撃↑ 特防↓','まじめ':'補正なし','てれや':'補正なし','すなお':'補正なし','きまぐれ':'補正なし','がんばりや':'補正なし','きょうせい':'補正なし' };
+                document.getElementById(`nature-${idx}`).value = data.nature + (natureStats[data.nature] ? ' ' + natureStats[data.nature] : '');
+            }
+            STAT_LABELS.forEach(stat => {
+                const input = document.querySelector(`input[name="ev-${stat}-${idx}"]`);
+                input.value = data.points[stat] !== undefined ? data.points[stat] : 0;
+            });
+            updateEVTotal(idx);
+            for (let m=1; m<=4; m++) document.getElementById(`move-${m}-${idx}`).value = data.moves[m-1] || '';
+            // 出典URLを控えめに表示
+            let note = document.getElementById(`yakkun-source-${idx}`);
+            if (!note) {
+                note = document.createElement('a'); note.id = `yakkun-source-${idx}`;
+                note.target = '_blank'; note.rel = 'noopener noreferrer'; note.style.cssText = 'display:block;font-size:12px;margin-top:8px;color:#2a64a3;word-break:break-all;';
+                document.querySelector(`#name-${idx}`).closest('.pokemon-section').appendChild(note);
+            }
+            note.href = data.source; note.textContent = '読み込み元：ポケ徹の育成論';
+        }
+
+        const trainingMode = document.getElementById('training-mode');
+        function isChampionsMode() { return trainingMode.value === 'champions'; }
+        function updateTrainingModeUI() {
+            const champions = isChampionsMode();
+            document.getElementById('mode-help').textContent = champions
+                ? 'Champions用の能力ポイント配分です。各能力0〜32、合計66まで。出力はPokéPasteではなくChampions用メモ形式になります。'
+                : '通常のPokéPaste形式で出力します。努力値は合計510、各能力252までです。';
+            document.querySelectorAll('.ev-input').forEach(input => {
+                input.max = champions ? 32 : 252;
+                input.step = champions ? 1 : 4;
+                input.placeholder = champions ? '0' : ((input.name.includes('-H-') || input.name.includes('-A-')) ? '252' : '0');
+                const idx = input.name.split('-')[2];
+                const val = parseInt(input.value) || 0;
+                if (val > (champions ? 32 : 252)) input.value = champions ? 32 : 252;
+                updateEVTotal(idx);
+            });
+            document.querySelectorAll('.ev-heading').forEach(el => el.textContent = champions ? '能力ポイント (Champions)' : '努力値 (EVs)');
+            document.querySelectorAll('.iv-input').forEach(input => {
+                input.disabled = champions;
+                input.title = champions ? 'Championsでは個体値入力を使用しません' : '';
+            });
+            document.querySelectorAll('.stats-block').forEach((block, i) => {
+                if (i === 1) block.style.opacity = champions ? '0.45' : '1';
+            });
+        }
+        trainingMode.addEventListener('change', updateTrainingModeUI);
 
         // ★ 努力値合計を更新する関数
         function updateEVTotal(idx) {
@@ -506,9 +915,9 @@
             
             const span = document.getElementById(`ev-total-${idx}`);
             if (span) {
-                span.textContent = `(${total}/510)`;
+                span.textContent = `(${total}/${isChampionsMode() ? 66 : 510})`;
                 // 510なら青太字、それ以外はデフォルト色
-                if (total === 510) {
+                if (total === (isChampionsMode() ? 66 : 510)) {
                     span.style.color = '#2a64a3';
                     span.style.fontWeight = 'bold';
                 } else {
@@ -612,14 +1021,14 @@
                     document.getElementById(`nature-${idx}`).value = jpNature;
                 }
 
-                // EVs (合計510制限)
+                // 努力値 / 能力ポイント（選択中の方式に応じて制限）
                 let currentTotalEV = 0;
                 STAT_LABELS.forEach(stat => { 
                     const input = document.querySelector(`input[name="ev-${stat}-${idx}"]`);
                     input.value = ''; 
                     if (evs[stat]) {
                         let val = parseInt(evs[stat]);
-                        if (val > 252) val = 252;
+                        if (val > (isChampionsMode() ? 32 : 252)) val = isChampionsMode() ? 32 : 252;
                         if (currentTotalEV + val > 510) {
                             val = 510 - currentTotalEV;
                         }
@@ -717,14 +1126,14 @@
                 document.getElementById(`nature-${idx}`).value = nature;
             }
 
-            // EVs (合計510制限)
+            // 努力値 / 能力ポイント（選択中の方式に応じて制限）
             let currentTotalEV = 0;
             STAT_LABELS.forEach(stat => { 
                 const input = document.querySelector(`input[name="ev-${stat}-${idx}"]`);
                 input.value = ''; 
                 if (evs[stat]) {
                     let val = parseInt(evs[stat]);
-                    if (val > 252) val = 252;
+                    if (val > (isChampionsMode() ? 32 : 252)) val = isChampionsMode() ? 32 : 252;
                     if (currentTotalEV + val > 510) {
                         val = 510 - currentTotalEV;
                     }
@@ -756,24 +1165,16 @@
             input.addEventListener('keydown', function(e) {
                 if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                     e.preventDefault();
+                    const max = isChampionsMode() ? 32 : 252;
+                    const step = isChampionsMode() ? 1 : 4;
                     let val = parseInt(this.value) || 0;
-                    let next;
-                    if (e.key === 'ArrowUp') {
-                        if (val < 4) next = 4;
-                        else if (val >= 252) next = 252;
-                        else { let rem = (val - 4) % 8; next = (rem === 0) ? val + 8 : val + (8 - rem); }
-                        if (next > 252) next = 252;
-                    } else {
-                        if (val <= 4) next = 0;
-                        else { let rem = (val - 4) % 8; next = (rem === 0) ? val - 8 : val - rem; }
-                        if (next < 0) next = 0;
-                    }
-                    this.value = next;
-                    this.dispatchEvent(new Event('input')); // 入力イベントを手動発火
+                    val = e.key === 'ArrowUp' ? Math.min(max, val + step) : Math.max(0, val - step);
+                    this.value = val;
+                    this.dispatchEvent(new Event('input'));
                 }
             });
 
-            // 手動入力制限 (252制限 & 510制限)
+                        // 手動入力制限 (252制限 & 510制限)
             input.addEventListener('input', function() {
                 if (this.value === '') {
                     updateEVTotal(this.name.split('-')[2]); // 空でも合計更新
@@ -784,7 +1185,7 @@
                 if (isNaN(val)) return;
 
                 if (val < 0) val = 0;
-                if (val > 252) val = 252;
+                if (val > (isChampionsMode() ? 32 : 252)) val = isChampionsMode() ? 32 : 252;
 
                 const parts = this.name.split('-');
                 const index = parts[2];
@@ -795,7 +1196,7 @@
                     }
                 });
 
-                const maxAllowed = 510 - otherTotal;
+                const maxAllowed = (isChampionsMode() ? 66 : 510) - otherTotal;
                 if (val > maxAllowed) {
                     val = maxAllowed;
                 }
@@ -836,9 +1237,35 @@
                 const jpItem = document.getElementById(`item-${i}`).value.trim();
                 const enItem = translate(jpItem, 'items');
                 
-                let block = `${enName}`;
+                let block;
+                if (isChampionsMode()) {
+                    block = `【${jpName}】\\n`;
+                    const abilityJP = document.getElementById(`ability-${i}`).value.trim();
+                    if (abilityJP) block += `特性: ${abilityJP}\\n`;
+                    const natureJP = document.getElementById(`nature-${i}`).value.trim();
+                    if (natureJP) block += `性格: ${natureJP.split(' ')[0]}\\n`;
+                    const pointNames = {H:'HP', A:'攻撃', B:'防御', C:'特攻', D:'特防', S:'素早さ'};
+                    const points = [];
+                    let totalPoints = 0;
+                    STAT_LABELS.forEach(stat => {
+                        const val = parseInt(document.querySelector(`input[name="ev-${stat}-${i}"]`).value) || 0;
+                        totalPoints += val;
+                        if (val > 0) points.push(`${pointNames[stat]} ${val}`);
+                    });
+                    block += `能力ポイント: ${points.length ? points.join(' / ') : '未配分'}\\n`;
+                    block += `合計: ${totalPoints}/66\\n`;
+                    const movesJP = [];
+                    for (let m = 1; m <= 4; m++) {
+                        const move = document.getElementById(`move-${m}-${i}`).value.trim();
+                        if (move) movesJP.push(`- ${move}`);
+                    }
+                    if (movesJP.length) block += movesJP.join('\\n') + '\\n';
+                    fullOutput += block + '\\n';
+                    continue;
+                }
+                block = `${enName}`;
                 if (enItem) block += ` @ ${enItem}`;
-                block += '\n';
+                block += '\\n';
 
                 const jpAbility = document.getElementById(`ability-${i}`).value.trim();
                 if (jpAbility) block += `Ability: ${translate(jpAbility, 'abilities')}\n`;
@@ -879,6 +1306,7 @@
             document.execCommand("copy");
             alert("コピーしました！");
         });
+        updateTrainingModeUI();
     </script>
 </body>
 </html>
